@@ -1,0 +1,104 @@
+name: CompareRunners
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  benchmark:
+    name: "Benchmark: ${{ matrix.os }}"
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-22.04          # GitHub standard
+          - monkci-ubuntu-24.04-4   # MonkCI ← replace with your actual label
+
+    steps:
+      - name: Install benchmarking tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y sysbench fio
+
+      - name: System info
+        run: |
+          echo "### Runner: ${{ matrix.os }} ###"
+          echo "--- CPU ---"
+          grep 'model name' /proc/cpuinfo | uniq
+          echo "Cores: $(nproc)"
+          lscpu | grep -E "Thread\(s\)|Socket\(s\)|NUMA"
+          echo "--- Memory ---"
+          free -h
+          echo "--- Disk ---"
+          lsblk -o NAME,SIZE,TYPE,MOUNTPOINT
+
+      - name: CPU benchmark
+        run: |
+          echo "### CPU Benchmark: ${{ matrix.os }} ###"
+          sysbench cpu --threads=$(nproc) --time=30 run
+
+      - name: Memory benchmark
+        run: |
+          echo "### Memory Benchmark: ${{ matrix.os }} ###"
+          sysbench memory --threads=$(nproc) --time=30 run
+
+      - name: Disk I/O benchmark
+        run: |
+          echo "### Disk I/O Benchmark: ${{ matrix.os }} ###"
+          fio --name=seqwrite --filename=testfile --size=512M \
+              --bs=1M --iodepth=8 --rw=write --ioengine=libaio \
+              --direct=1 --output-format=terse
+          fio --name=seqread --filename=testfile --size=512M \
+              --bs=1M --iodepth=8 --rw=read --ioengine=libaio \
+              --direct=1 --output-format=terse
+          fio --name=randread --filename=testfile --size=512M \
+              --bs=4k --iodepth=32 --rw=randread --ioengine=libaio \
+              --direct=1 --output-format=terse
+          rm testfile
+
+  build:
+    name: "Build: ${{ matrix.os }}"
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-22.04
+          - monkci-ubuntu-24.04-4   # ← replace with your actual label
+        node_version: [20]
+
+    steps:
+      - name: Disable git crlf
+        run: git config --global core.autocrlf false
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          repository: vercel/next.js
+          ref: v14.2.12
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v3
+
+      - name: Setup node@${{ matrix.node_version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node_version }}
+          cache: "pnpm"
+
+      - name: Record build start time
+        run: echo "BUILD_START=$(date +%s)" >> $GITHUB_ENV
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build packages
+        run: pnpm run build
+
+      - name: Report build duration
+        run: |
+          END=$(date +%s)
+          echo "### Build time on ${{ matrix.os }}: $(( END - BUILD_START ))s ###"
