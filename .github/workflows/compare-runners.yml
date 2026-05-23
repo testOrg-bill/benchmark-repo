@@ -12,7 +12,7 @@ jobs:
       fail-fast: false
       matrix:
         os:
-          - ubuntu-22.04          # GitHub standard
+          - ubuntu-latest          # GitHub standard
           - monkci-ubuntu-24.04-4   # MonkCI ← replace with your actual label
 
     steps:
@@ -65,7 +65,7 @@ jobs:
       fail-fast: false
       matrix:
         os:
-          - ubuntu-22.04
+          - ubuntu-latest
           - monkci-ubuntu-24.04-4   # ← replace with your actual label
         node_version: [20]
 
