@@ -7,7 +7,7 @@ on:
 jobs:
   benchmark:
     name: "Benchmark: ${{ matrix.os }}"
-    runs-on: ${{ matrix.os }}
+    runs-on: monkci-ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
@@ -59,7 +59,7 @@ jobs:
 
   build:
     name: "Build: ${{ matrix.os }}"
-    runs-on: ${{ matrix.os }}
+    runs-on: monkci-ubuntu-24.04-16
     timeout-minutes: 60
     strategy:
       fail-fast: false
